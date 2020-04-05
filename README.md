@@ -11,10 +11,10 @@ This is incomplete, stupidly coded as a simple state machine, and probably very 
 
 Currently very incomplete:
 - user mode only 
-- no shift instructions
-- no set instructions
+- ~~no shift instructions~~
+- ~~no set instructions~~
 - byte/halfword load/store always loads/stores 32 bit entities 
-- not a lot else (ROM/RAM in block RAM)
+- not a lot else (ROM/RAM and optionally registers in block RAM)
 
 This core uses the internal 48 MHz oscillator of the UP5k FPGA and generated an internal reset signal.
 The only output right now is the RGB LED.
@@ -22,7 +22,11 @@ The only output right now is the RGB LED.
 Directories:
 
 * sim/     iverilog simulatable version
-* synth/   yosys synthesizable version for UPduino2. Simply type make!
+* synth/   yosys synthesizable version for UPduino2. 
+           There are two versions: one with registers implemented as distributed RAM and one with registers in block RAM
+           The BRAM version saves almost 50% of the FPGA space (ca. 2200 LUTs used right now)
+           Simply type make rv_synth.flash or make rv_synth_bramregs.flash
+          
 * tests/   a simple test program (hacked to run standalone)
 * tools/   bin2hex.sh, converts objcopy-generated binary to hex file readable by Verilog's $readmemh
 
