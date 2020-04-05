@@ -38,7 +38,7 @@ module rv (
   initial begin
     $dumpfile("rv.vcd");
     $dumpvars(0,rv);
-    $readmemh("t2a.hex", imem);
+    $readmemh("t2b.hex", imem);
     $display("go!");
     reset = 1;
     #20
@@ -184,11 +184,11 @@ module rv_core (
                       case (funct3)
                         3'b000: begin if (rv5_reg[rs1]==rv5_reg[rs2]) branch <= 1; $display("BEQ "); end
                         3'b001: begin if (rv5_reg[rs1]!=rv5_reg[rs2]) branch <= 1; $display("BNE "); end
-                        3'b100: begin if (rv5_reg[rs1]< rv5_reg[rs2]) branch <= 1; $display("BLT "); end
-                        3'b101: begin if (rv5_reg[rs1]>=rv5_reg[rs2]) branch <= 1; $display("BGE ",); end
+                        3'b100: begin if ($signed(rv5_reg[rs1])< $signed(rv5_reg[rs2])) branch <= 1; $display("BLT "); end
+                        3'b101: begin if ($signed(rv5_reg[rs1])>=$signed(rv5_reg[rs2])) branch <= 1; $display("BGE "); end
                         3'b110: begin if (rv5_reg[rs1]< rv5_reg[rs2]) branch <= 1; $display("BLTU "); end
                         3'b111: begin if (rv5_reg[rs1]>=rv5_reg[rs2]) branch <= 1; $display("BGEU "); end
-                        default: exception = 1;
+                        default: exception <= 1;
                       endcase
                       end
           7'b0000011: begin
@@ -200,27 +200,42 @@ module rv_core (
                         3'b010: begin daddr <= I_immediate_SE+rv5_reg[rs1]; drw <= 1'b0; $display("LW from %x + %x", I_immediate_SE, rv5_reg[rs1]); end
                         3'b100: begin daddr <= I_immediate_SE+rv5_reg[rs1]; drw <= 1'b0; $display("LBU "); end
                         3'b101: begin daddr <= I_immediate_SE+rv5_reg[rs1]; drw <= 1'b0; $display("LWU "); end
+                        default: exception <= 1;
                       endcase
                       end
           7'b0100011: begin
                       mem <= 1;
-                      wb <= 1;
+                      wb <= 0;
                       case (funct3)
                         3'b000: begin daddr <= S_immediate_SE+rv5_reg[rs1]; dout <= rv5_reg[rs2]; drw <= 1'b1; $display("SB "); end
                         3'b001: begin daddr <= S_immediate_SE+rv5_reg[rs1]; dout <= rv5_reg[rs2]; drw <= 1'b1; $display("SH "); end
                         3'b010: begin daddr <= S_immediate_SE+rv5_reg[rs1]; dout <= rv5_reg[rs2]; drw <= 1'b1; $display("SW to %x = %x + %x <= %x", S_immediate_SE+rv5_reg[rs1], S_immediate_SE, rv5_reg[rs1], rv5_reg[rs2]); end
+                        default: exception <= 1;
                       endcase
                       end
           7'b0010011: begin
                       wb <= 1;
                       case (funct3)
                         3'b000: begin alures <= I_immediate_SE + rv5_reg[rs1]; $display("ADDI %x + (R%d=)%x = %x", I_immediate_SE, rs1, rv5_reg[rs1], alures); end
-                        3'b001: begin $display("SL/SR "); end
-                        3'b010: begin $display("SLTI "); end
-                        3'b011: begin $display("SLTIU "); end
+                        3'b001: begin 
+                          case (funct7)
+                            7'b0000000: begin alures <= (rv5_reg[rs1] << shamt); $display("SLLI "); end
+                            default: exception <= 1;
+                          endcase
+                          end
+                        3'b010: begin alures <= $signed(rv5_reg[rs1]) < $signed(I_immediate_SE) ? 32'h1 : 32'h0; $display("SLT "); end
+                        3'b011: begin alures <= rv5_reg[rs1] < I_immediate_SE ? 32'h1 : 32'h0; $display("SLTIU "); end
                         3'b100: begin alures <= rv5_reg[rs1] ^ I_immediate_SE; $display("XORI "); end
+                        3'b101: begin 
+                          case (funct7)
+                            7'b0100000: begin alures <= rv5_reg[rs1] >>> shamt; $display("SRAI "); end
+                            7'b0000000: begin alures <= rv5_reg[rs1] >> shamt; $display("SRLI "); end
+                            default: exception <= 1;
+                          endcase
+                          end
                         3'b110: begin alures <= rv5_reg[rs1] | I_immediate_SE; $display("ORI "); end
                         3'b111: begin alures <= rv5_reg[rs1] & I_immediate_SE; $display("ANDI "); end
+                        default: exception <= 1;
                       endcase
                       end 
           7'b0110011: begin
@@ -229,13 +244,20 @@ module rv_core (
                         3'b000: begin if (funct7 == 7'b0100000) begin alures <= rv5_reg[rs1] - rv5_reg[rs2]; $display("SUB "); end
                                                            else begin alures <= rv5_reg[rs1] + rv5_reg[rs2]; $display("ADD "); end
                                 end
-                        3'b001: begin $display("SLL "); end
-                        3'b010: begin $display("SLT "); end
-                        3'b011: begin $display("SLTU "); end
+                        3'b001: begin alures <= rv5_reg[rs1] << (rv5_reg[rs2] & 32'h1F); $display("SLL "); end
+                        3'b010: begin alures <= $signed(rv5_reg[rs1]) < $signed(rv5_reg[rs2]) ? 32'h1 : 32'h0; $display("SLT "); end
+                        3'b011: begin alures <= rv5_reg[rs1] < rv5_reg[rs2] ? 32'h1 : 32'h0; $display("SLTU "); end
                         3'b100: begin alures <= rv5_reg[rs1] ^ rv5_reg[rs2]; $display("XOR "); end
-                        3'b101: begin $display("SRx "); end
+                        3'b101: begin
+                          case (funct7)
+                            7'b0100000: begin alures <= rv5_reg[rs1] >>> (rv5_reg[rs2] & 32'h1F); $display("SRA "); end
+                            7'b0000000: begin alures <= rv5_reg[rs1] >> (rv5_reg[rs2] & 32'h1F); $display("SRL "); end
+                            default: exception <= 1;
+                          endcase
+                          end
                         3'b110: begin alures <= rv5_reg[rs1] | rv5_reg[rs2]; $display("OR "); end
                         3'b111: begin alures <= rv5_reg[rs1] & rv5_reg[rs2]; $display("AND "); end
+                        default: exception <= 1;
                       endcase
                       end 
           default: begin
