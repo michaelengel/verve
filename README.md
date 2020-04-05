@@ -21,8 +21,8 @@ The only output right now is the RGB LED.
 
 Directories:
 
-  sim/     iverilog simulatable version
-  synth/   yosys synthesizable version for UPduino2. Simply type make!
-  tests/   a simple test program (hacked to run standalone)
-  tools/   bin2hex.sh, converts objcopy-generated binary to hex file readable by Verilog's $readmemh
+* sim/     iverilog simulatable version
+* synth/   yosys synthesizable version for UPduino2. Simply type make!
+* tests/   a simple test program (hacked to run standalone)
+* tools/   bin2hex.sh, converts objcopy-generated binary to hex file readable by Verilog's $readmemh
 
